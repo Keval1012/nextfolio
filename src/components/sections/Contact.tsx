@@ -24,6 +24,7 @@ export function Contact() {
     email: "",
     subject: "",
     message: "",
+    _gotcha: "", // Spam honeypot
   });
 
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -49,25 +50,61 @@ export function Contact() {
     e.preventDefault();
     setErrorMessage("");
 
-    // Basic Validation
-    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
+    // Client-side Validation
+    const trimmedName = formData.name.trim();
+    const trimmedEmail = formData.email.trim();
+    const trimmedMessage = formData.message.trim();
+
+    if (!trimmedName || !trimmedEmail || !trimmedMessage) {
       setStatus("error");
       setErrorMessage("Please complete all required fields.");
       return;
     }
 
+    if (trimmedName.length < 2) {
+      setStatus("error");
+      setErrorMessage("Please enter a valid name (at least 2 characters).");
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email.trim())) {
+    if (!emailRegex.test(trimmedEmail)) {
       setStatus("error");
       setErrorMessage("Please provide a valid email address.");
       return;
     }
 
+    if (trimmedMessage.length < 10) {
+      setStatus("error");
+      setErrorMessage("Please write a message with at least 10 characters.");
+      return;
+    }
+
     setStatus("submitting");
 
-    // Realistic client-side simulated dispatch
     try {
-      await new Promise((resolve) => setTimeout(resolve, 900));
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          email: trimmedEmail,
+          subject: formData.subject.trim(),
+          message: trimmedMessage,
+          _gotcha: formData._gotcha,
+        }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error || "Failed to send message. Please try emailing directly."
+        );
+      }
+
       setStatus("success");
 
       // Trigger subtle confetti burst
@@ -87,10 +124,17 @@ export function Contact() {
         email: "",
         subject: "",
         message: "",
+        _gotcha: "",
       });
-    } catch {
+    } catch (err: unknown) {
       setStatus("error");
-      setErrorMessage("An unexpected error occurred. Please try emailing directly.");
+      if (err instanceof Error) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage(
+          "An unexpected error occurred. Please try emailing directly."
+        );
+      }
     }
   };
 
@@ -249,6 +293,20 @@ export function Contact() {
                     </div>
                   )}
 
+                  {/* Honeypot field for bot spam protection - hidden from legitimate visitors */}
+                  <div className="hidden" aria-hidden="true" style={{ display: "none" }}>
+                    <label htmlFor="_gotcha">Do not fill this field</label>
+                    <input
+                      type="text"
+                      id="_gotcha"
+                      name="_gotcha"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={formData._gotcha}
+                      onChange={handleChange}
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label
@@ -262,10 +320,11 @@ export function Contact() {
                         id="name"
                         name="name"
                         required
+                        disabled={status === "submitting"}
                         value={formData.name}
                         onChange={handleChange}
                         placeholder="e.g. Alex Johnson"
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-colors"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-colors disabled:opacity-60"
                       />
                     </div>
 
@@ -281,10 +340,11 @@ export function Contact() {
                         id="email"
                         name="email"
                         required
+                        disabled={status === "submitting"}
                         value={formData.email}
                         onChange={handleChange}
                         placeholder="alex@company.com"
-                        className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-colors"
+                        className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-colors disabled:opacity-60"
                       />
                     </div>
                   </div>
@@ -300,29 +360,38 @@ export function Contact() {
                       type="text"
                       id="subject"
                       name="subject"
+                      disabled={status === "submitting"}
                       value={formData.subject}
                       onChange={handleChange}
                       placeholder="e.g. Engineering Role / Project Inquiry"
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-colors"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-colors disabled:opacity-60"
                     />
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="message"
-                      className="block text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300 mb-1.5"
-                    >
-                      Message <span className="text-cyan-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label
+                        htmlFor="message"
+                        className="block text-xs font-mono font-medium text-zinc-700 dark:text-zinc-300"
+                      >
+                        Message <span className="text-cyan-500">*</span>
+                      </label>
+                      {formData.message.length > 0 && (
+                        <span className="text-[11px] font-mono text-zinc-400">
+                          {formData.message.length} / 5000
+                        </span>
+                      )}
+                    </div>
                     <textarea
                       id="message"
                       name="message"
                       required
                       rows={4}
+                      disabled={status === "submitting"}
                       value={formData.message}
                       onChange={handleChange}
                       placeholder="Hi Keval, we are working on a project..."
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-colors resize-y"
+                      className="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-100 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-colors resize-y disabled:opacity-60"
                     />
                   </div>
 
